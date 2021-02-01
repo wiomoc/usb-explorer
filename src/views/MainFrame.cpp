@@ -59,7 +59,7 @@ static void delete_device(vector<USBDevice> *root, libusb_device *ref)
                 root->end());
 }
 
-vector<USBDevice> enumerate_devices(libusb_context *usb_ctx)
+vector<USBDevice> enumerate_devices(libusb_context *usb_ctx, int *devices_count)
 {
     libusb_device **device_list;
     int device_list_count = libusb_get_device_list(usb_ctx, &device_list);
@@ -78,6 +78,7 @@ vector<USBDevice> enumerate_devices(libusb_context *usb_ctx)
         get_or_create_device(&root_devices, device);
     }
 
+    *devices_count = device_list_count;
     return root_devices;
 }
 
@@ -105,6 +106,56 @@ void MainFrame::OnClose(wxCloseEvent &event)
     //exit(0);
 }
 
+MainFrame::MainFrame(App *app) : wxFrame(NULL, wxID_ANY, "USB Explorer", wxDefaultPosition, wxSize(650, 400)), app(app)
+{
+    libusb_context *usb_ctx = this->app->usb_ctx;
+    this->rootDevices = enumerate_devices(usb_ctx, &this->devicesCount);
+
+    wxTreeListCtrl *tree = new wxTreeListCtrl(this, wxID_ANY);
+    tree->AppendColumn("Hierarchy");
+    tree->AppendColumn("VID");
+    tree->AppendColumn("PID");
+    tree->AppendColumn("Address");
+    tree->AppendColumn("Port");
+
+    CreateStatusBar();
+    this->updateDevices(tree);
+
+    if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
+    {
+        this->hotplugController = USBHotPlugController::start(usb_ctx, this->GetEventHandler(), [=](libusb_device *device, libusb_hotplug_event event) {
+            if (event == LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED)
+            {
+                printf("new device arrived; address: %d\n", libusb_get_device_address(device));
+                this->devicesCount++;
+                get_or_create_device(&this->rootDevices, device);
+            }
+            else if (event == LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT)
+            {
+                printf("device left; address: %d\n", libusb_get_device_address(device));
+                this->devicesCount--;
+                delete_device(&this->rootDevices, device);
+            }
+            // XXX
+            tree->DeleteAllItems();
+            this->updateDevices(tree);
+        });
+    }
+}
+
+void MainFrame::updateDevices(wxTreeListCtrl *tree) {
+    static wxString defaultStatusBarText = "Found %d devices";
+    static wxString oneDeviceFoundStatusBarText = "Found one device";
+    static wxString noDevicesFoundStatusBarText = "No devices found!";
+
+    if(rootDevices.empty()) {
+        SetStatusText(noDevicesFoundStatusBarText);
+    } else {
+        SetStatusText( this->devicesCount == 1 ? oneDeviceFoundStatusBarText:wxString::Format(defaultStatusBarText, this->devicesCount));
+        buildTree(tree, tree->GetRootItem(), rootDevices);
+    }
+}
+
 void MainFrame::buildTree(wxTreeListCtrl *tree, wxTreeListItem item, vector<USBDevice> &devices)
 {
     for (auto device = devices.begin(); device != devices.end(); device++)
@@ -123,53 +174,5 @@ void MainFrame::buildTree(wxTreeListCtrl *tree, wxTreeListItem item, vector<USBD
         tree->Expand(newItem);
 
         buildTree(tree, newItem, device->childreen);
-    }
-}
-
-static wxString defaultStatusBarText = "Welcome to USB Explorer!";
-static wxString noDevicesFoundStatusBarText = "No devices found!";
-
-MainFrame::MainFrame(App *app) : wxFrame(NULL, wxID_ANY, "USB Explorer", wxDefaultPosition, wxSize(650, 400)), app(app)
-{
-    libusb_context *usb_ctx = this->app->usb_ctx;
-    this->rootDevices = enumerate_devices(usb_ctx);
-
-    wxTreeListCtrl *tree = new wxTreeListCtrl(this, wxID_ANY);
-    tree->AppendColumn("Hierarchy");
-    tree->AppendColumn("VID");
-    tree->AppendColumn("PID");
-    tree->AppendColumn("Address");
-    tree->AppendColumn("Port");
-
-    CreateStatusBar();
-    if(rootDevices.empty()) {
-        SetStatusText(noDevicesFoundStatusBarText);
-    } else {
-        SetStatusText(defaultStatusBarText);
-        buildTree(tree, tree->GetRootItem(), rootDevices);
-    }
-    
-    if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
-    {
-        this->hotplugController = USBHotPlugController::start(usb_ctx, this->GetEventHandler(), [=](libusb_device *device, libusb_hotplug_event event) {
-            if (event == LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED)
-            {
-                printf("new device arrived; address: %d\n", libusb_get_device_address(device));
-                get_or_create_device(&this->rootDevices, device);
-            }
-            else if (event == LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT)
-            {
-                printf("device left; address: %d\n", libusb_get_device_address(device));
-                delete_device(&this->rootDevices, device);
-            }
-            // XXX
-            tree->DeleteAllItems();
-            if(rootDevices.empty()) {
-                SetStatusText(noDevicesFoundStatusBarText);
-            } else {
-                SetStatusText(defaultStatusBarText);
-                buildTree(tree, tree->GetRootItem(), rootDevices);
-            }
-        });
     }
 }

@@ -19,7 +19,10 @@ protected:
 
 private:
     void buildTree(wxTreeListCtrl *tree, wxTreeListItem item,  std::vector<USBDevice> &devices);
+    void updateDevices(wxTreeListCtrl *tree);
+
     std::vector<USBDevice> rootDevices;
+    int devicesCount;
     App *app;
     std::shared_ptr<USBHotPlugController> hotplugController;
     wxDECLARE_EVENT_TABLE();
