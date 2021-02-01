@@ -72,11 +72,9 @@ vector<USBDevice> enumerate_devices(libusb_context *usb_ctx)
     }
 
     vector<USBDevice> root_devices;
-
     for (int device_list_pos = 0; device_list_pos < device_list_count; device_list_pos++)
     {
         libusb_device *device = device_list[device_list_pos];
-
         get_or_create_device(&root_devices, device);
     }
 
@@ -86,13 +84,12 @@ vector<USBDevice> enumerate_devices(libusb_context *usb_ctx)
 
 
 wxBEGIN_EVENT_TABLE(MainFrame, wxFrame)
-    EVT_MENU(wxID_EXIT, MainFrame::OnQuit)
-        EVT_CLOSE(MainFrame::OnClose)
-            wxEND_EVENT_TABLE()
+EVT_MENU(wxID_EXIT, MainFrame::OnQuit)
+EVT_CLOSE(MainFrame::OnClose)
+wxEND_EVENT_TABLE()
 
-                void MainFrame::OnQuit(wxCommandEvent &event)
+void MainFrame::OnQuit(wxCommandEvent &event)
 {
-
     Close(true);
 }
 void MainFrame::OnClose(wxCloseEvent &event)
@@ -103,7 +100,8 @@ void MainFrame::OnClose(wxCloseEvent &event)
         this->hotplugController = nullptr;
     }
     Destroy();
-    //this->app->OnExit();
+    // TODO
+    this->app->OnExit();
     //exit(0);
 }
 
@@ -128,7 +126,7 @@ void MainFrame::buildTree(wxTreeListCtrl *tree, wxTreeListItem item, vector<USBD
     }
 }
 
-MainFrame::MainFrame(App *app) : wxFrame(NULL, wxID_ANY, "USB", wxDefaultPosition, wxSize(650, 400)), app(app)
+MainFrame::MainFrame(App *app) : wxFrame(NULL, wxID_ANY, "USB Explorer", wxDefaultPosition, wxSize(650, 400)), app(app)
 {
 
     libusb_context *usb_ctx = this->app->usb_ctx;
@@ -143,13 +141,14 @@ MainFrame::MainFrame(App *app) : wxFrame(NULL, wxID_ANY, "USB", wxDefaultPositio
     if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
     {
         this->hotplugController = USBHotPlugController::start(usb_ctx, this->GetEventHandler(), [=](libusb_device *device, libusb_hotplug_event event) {
-            printf("Event: %p \n", device);
             if (event == LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED)
             {
+                printf("new device arrived; address: %d\n", libusb_get_device_address(device));
                 get_or_create_device(&this->rootDevices, device);
             }
             else if (event == LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT)
             {
+                printf("device left; address: %d\n", libusb_get_device_address(device));
                 delete_device(&this->rootDevices, device);
             }
             // XXX
