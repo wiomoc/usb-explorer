@@ -20,7 +20,7 @@ USBHotPlugController::start(libusb_context *usb_ctx,
                             wxEvtHandler *event_handler,
                             std::function<void(libusb_device *device, libusb_hotplug_event event)> callback)
 {
-    std::shared_ptr<USBHotPlugController> controller = std::make_shared<USBHotPlugController>(usb_ctx, event_handler, callback);
+    std::shared_ptr<USBHotPlugController> controller(new USBHotPlugController(usb_ctx, event_handler, callback));
 
     int status = libusb_hotplug_register_callback(usb_ctx,
                                                   LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED | LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT,

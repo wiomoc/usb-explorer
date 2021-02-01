@@ -126,18 +126,29 @@ void MainFrame::buildTree(wxTreeListCtrl *tree, wxTreeListItem item, vector<USBD
     }
 }
 
+static wxString defaultStatusBarText = "Welcome to USB Explorer!";
+static wxString noDevicesFoundStatusBarText = "No devices found!";
+
 MainFrame::MainFrame(App *app) : wxFrame(NULL, wxID_ANY, "USB Explorer", wxDefaultPosition, wxSize(650, 400)), app(app)
 {
-
     libusb_context *usb_ctx = this->app->usb_ctx;
     this->rootDevices = enumerate_devices(usb_ctx);
+
     wxTreeListCtrl *tree = new wxTreeListCtrl(this, wxID_ANY);
     tree->AppendColumn("Hierarchy");
     tree->AppendColumn("VID");
     tree->AppendColumn("PID");
     tree->AppendColumn("Address");
     tree->AppendColumn("Port");
-    buildTree(tree, tree->GetRootItem(), rootDevices);
+
+    CreateStatusBar();
+    if(rootDevices.empty()) {
+        SetStatusText(noDevicesFoundStatusBarText);
+    } else {
+        SetStatusText(defaultStatusBarText);
+        buildTree(tree, tree->GetRootItem(), rootDevices);
+    }
+    
     if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
     {
         this->hotplugController = USBHotPlugController::start(usb_ctx, this->GetEventHandler(), [=](libusb_device *device, libusb_hotplug_event event) {
@@ -153,10 +164,12 @@ MainFrame::MainFrame(App *app) : wxFrame(NULL, wxID_ANY, "USB Explorer", wxDefau
             }
             // XXX
             tree->DeleteAllItems();
-            this->buildTree(tree, tree->GetRootItem(), rootDevices);
+            if(rootDevices.empty()) {
+                SetStatusText(noDevicesFoundStatusBarText);
+            } else {
+                SetStatusText(defaultStatusBarText);
+                buildTree(tree, tree->GetRootItem(), rootDevices);
+            }
         });
     }
-
-    CreateStatusBar();
-    SetStatusText("Welcome to USB Explorer!");
 }
