@@ -9,6 +9,7 @@ int USBHotPlugController::usb_hotplug_callback_fn(libusb_context *ctx, libusb_de
         std::shared_ptr<USBHotPlugController> controller_shared = weak_controller.lock();
         if (controller_shared != nullptr && !controller_shared->stopped)
         {
+            libusb_ref_device(device);
             controller_shared->callback(device, event);
         }
     });

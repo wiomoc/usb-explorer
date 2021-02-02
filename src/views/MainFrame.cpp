@@ -1,93 +1,29 @@
 #include "MainFrame.hpp"
-#include <algorithm>
+#include "DeviceListPanel.hpp"
 
-extern "C"
+#include <wx/splitter.h>
+
+enum
 {
-#include "libusb.h"
-}
-
-
-using namespace std;
-
-static vector<USBDevice> *get_or_create_device(vector<USBDevice> *root, libusb_device *ref)
-{
-
-    if (!ref)
-    {
-        return root;
-    }
-    else
-    {
-        libusb_device *parent = libusb_get_parent(ref);
-        vector<USBDevice> *parent_list = get_or_create_device(root, parent);
-        auto child = find_if(parent_list->begin(), parent_list->end(), [=](USBDevice &device) { return device.ref == ref; });
-        if (child == parent_list->end())
-        {
-            uint8_t port = libusb_get_port_number(ref);
-            USBDevice dev = USBDevice(ref, libusb_get_bus_number(ref), port, libusb_get_device_address(ref));
-            libusb_get_device_descriptor(ref, &dev.descriptor);
-            libusb_device_handle *device_handle;
-            if (!libusb_open(ref, &device_handle))
-            {
-                uint8_t product_string_index = dev.descriptor.iProduct;
-                if (product_string_index)
-                {
-                    char str[20];
-                    libusb_get_string_descriptor_ascii(device_handle, product_string_index, (uint8_t *)str, sizeof(str));
-
-                    dev.name += str;
-                }
-            }
-            // Sort by port number
-            auto insertAt = find_if(parent_list->begin(), parent_list->end(), [=](USBDevice &device) { return device.port > port; });
-            insertAt = parent_list->insert(insertAt, move(dev));
-            return &(insertAt->childreen);
-        }
-        else
-        {
-            return &child->childreen;
-        }
-    }
-}
-
-static void delete_device(vector<USBDevice> *root, libusb_device *ref)
-{
-    root->erase(std::remove_if(root->begin(), root->end(), [=](USBDevice &device) {
-                    delete_device(&device.childreen, ref);
-                    return device.ref == ref;
-                }),
-                root->end());
-}
-
-vector<USBDevice> enumerate_devices(libusb_context *usb_ctx, int *devices_count)
-{
-    libusb_device **device_list;
-    int device_list_count = libusb_get_device_list(usb_ctx, &device_list);
-
-    if (device_list_count < 0)
-    {
-        printf("libusb get_device_list failed: %d\n", device_list_count);
-        libusb_exit(usb_ctx);
-        exit(-1);
-    }
-
-    vector<USBDevice> root_devices;
-    for (int device_list_pos = 0; device_list_pos < device_list_count; device_list_pos++)
-    {
-        libusb_device *device = device_list[device_list_pos];
-        get_or_create_device(&root_devices, device);
-    }
-
-    *devices_count = device_list_count;
-    return root_devices;
-}
-
-
+    ID_DEVICE_LIST = 102
+};
 
 wxBEGIN_EVENT_TABLE(MainFrame, wxFrame)
-EVT_MENU(wxID_EXIT, MainFrame::OnQuit)
-EVT_CLOSE(MainFrame::OnClose)
-wxEND_EVENT_TABLE()
+    EVT_MENU(wxID_EXIT, MainFrame::OnQuit)
+        EVT_CLOSE(MainFrame::OnClose)
+            EVT_COMMAND(ID_DEVICE_LIST, DEVICE_LIST_UPDATE, MainFrame::OnDevicesCountUpdate)
+                EVT_COMMAND(ID_DEVICE_LIST, DEVICE_SELECTED, MainFrame::OnDeviceSelected)
+                    wxEND_EVENT_TABLE()
+
+                        MainFrame::MainFrame(App *app) : wxFrame(NULL, wxID_ANY, "USB Explorer", wxDefaultPosition, wxSize(650, 400)), app(app)
+{
+    CreateStatusBar();
+    wxSplitterWindow *splitter = new wxSplitterWindow(this);
+
+    DeviceListPanel *list = new DeviceListPanel(splitter, ID_DEVICE_LIST, app);
+    detail = new DeviceDetailPanel(splitter, wxID_ANY, app);
+    splitter->SplitHorizontally(list, detail);
+}
 
 void MainFrame::OnQuit(wxCommandEvent &event)
 {
@@ -95,84 +31,35 @@ void MainFrame::OnQuit(wxCommandEvent &event)
 }
 void MainFrame::OnClose(wxCloseEvent &event)
 {
-    if (this->hotplugController)
-    {
-        this->hotplugController->stop();
-        this->hotplugController = nullptr;
-    }
     Destroy();
     // TODO
     this->app->OnExit();
     //exit(0);
 }
 
-MainFrame::MainFrame(App *app) : wxFrame(NULL, wxID_ANY, "USB Explorer", wxDefaultPosition, wxSize(650, 400)), app(app)
+void MainFrame::OnDevicesCountUpdate(wxCommandEvent &event)
 {
-    libusb_context *usb_ctx = this->app->usb_ctx;
-    this->rootDevices = enumerate_devices(usb_ctx, &this->devicesCount);
-
-    wxTreeListCtrl *tree = new wxTreeListCtrl(this, wxID_ANY);
-    tree->AppendColumn("Hierarchy");
-    tree->AppendColumn("VID");
-    tree->AppendColumn("PID");
-    tree->AppendColumn("Address");
-    tree->AppendColumn("Port");
-
-    CreateStatusBar();
-    this->updateDevices(tree);
-
-    if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
-    {
-        this->hotplugController = USBHotPlugController::start(usb_ctx, this->GetEventHandler(), [=](libusb_device *device, libusb_hotplug_event event) {
-            if (event == LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED)
-            {
-                printf("new device arrived; address: %d\n", libusb_get_device_address(device));
-                this->devicesCount++;
-                get_or_create_device(&this->rootDevices, device);
-            }
-            else if (event == LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT)
-            {
-                printf("device left; address: %d\n", libusb_get_device_address(device));
-                this->devicesCount--;
-                delete_device(&this->rootDevices, device);
-            }
-            // XXX
-            tree->DeleteAllItems();
-            this->updateDevices(tree);
-        });
-    }
-}
-
-void MainFrame::updateDevices(wxTreeListCtrl *tree) {
-    static wxString defaultStatusBarText = "Found %d devices";
-    static wxString oneDeviceFoundStatusBarText = "Found one device";
     static wxString noDevicesFoundStatusBarText = "No devices found!";
+    static wxString oneDeviceFoundStatusBarText = "Found one device";
+    static wxString defaultStatusBarText = "Found %d devices";
 
-    if(rootDevices.empty()) {
+    int devicesCount = event.GetInt();
+    if (devicesCount == 0)
+    {
         SetStatusText(noDevicesFoundStatusBarText);
-    } else {
-        SetStatusText( this->devicesCount == 1 ? oneDeviceFoundStatusBarText:wxString::Format(defaultStatusBarText, this->devicesCount));
-        buildTree(tree, tree->GetRootItem(), rootDevices);
+    }
+    else if (devicesCount == 1)
+    {
+        SetStatusText(oneDeviceFoundStatusBarText);
+    }
+    else
+    {
+        SetStatusText(wxString::Format(defaultStatusBarText, devicesCount));
     }
 }
 
-void MainFrame::buildTree(wxTreeListCtrl *tree, wxTreeListItem item, vector<USBDevice> &devices)
+void MainFrame::OnDeviceSelected(wxCommandEvent &event)
 {
-    for (auto device = devices.begin(); device != devices.end(); device++)
-    {
-        string &name = device->name;
-        if (name.empty())
-        {
-            name = "Unknown Device";
-        }
-        wxTreeListItem newItem = tree->AppendItem(item, name);
-        tree->SetItemText(newItem, 1, wxString::Format("0x%04hx", device->descriptor.idVendor));
-        tree->SetItemText(newItem, 2, wxString::Format("0x%04hx", device->descriptor.idProduct));
-        tree->SetItemText(newItem, 3, to_string(device->address));
-        tree->SetItemText(newItem, 4, to_string(device->port));
-
-        tree->Expand(newItem);
-
-        buildTree(tree, newItem, device->childreen);
-    }
+    USBDevice *device = (USBDevice *)event.GetClientData();
+    detail->setDevice(device);
 }

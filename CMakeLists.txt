@@ -13,6 +13,9 @@ set(SOURCES
     src/main.cpp
     src/App.cpp
     src/views/MainFrame.cpp
+    src/views/DeviceListPanel.cpp
+    src/views/DeviceDetailPanel.cpp
+    src/usb/USBService.cpp
     src/usb/USBHotPlugController.cpp
 )
 

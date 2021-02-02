@@ -14,7 +14,11 @@ public:
     USBDevice(libusb_device *ref,
               uint8_t bus,
               uint8_t port,
-              uint8_t address) : ref(ref), bus(bus), port(port), address(address) {}
+              uint8_t address) : ref(ref), bus(bus), port(port), address(address){};
+    ~USBDevice()
+    {
+        libusb_unref_device(ref);
+    }
 
     libusb_device *ref;
     uint8_t bus;
@@ -23,5 +27,5 @@ public:
     struct libusb_device_descriptor descriptor;
     std::string name;
 
-    std::vector<USBDevice> childreen;
+    std::vector<std::shared_ptr<USBDevice>> childreen;
 };

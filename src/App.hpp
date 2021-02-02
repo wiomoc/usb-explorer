@@ -1,17 +1,14 @@
 #pragma once
 
 #include <wx/wx.h>
-extern "C"
-{
-#include "libusb.h"
-}
+#include "usb/USBService.hpp"
 
 class App : public wxApp
 {
 public:
     bool OnInit() wxOVERRIDE;
     int OnExit() wxOVERRIDE;
-    libusb_context *usb_ctx;
+    USBService *usbService;
 
 private:
     wxFrame *frame;
