@@ -17,7 +17,7 @@ DeviceDetailPanel::~DeviceDetailPanel()
 {
 }
 
-void DeviceDetailPanel::setDevice(USBDevice *device)
+void DeviceDetailPanel::setDevice(std::shared_ptr<USBDevice> device)
 {
     titleText->SetLabel(device->name);
 }

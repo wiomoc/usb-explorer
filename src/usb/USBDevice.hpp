@@ -27,5 +27,7 @@ public:
     struct libusb_device_descriptor descriptor;
     std::string name;
 
+    std::string vendorName;
+
     std::vector<std::shared_ptr<USBDevice>> childreen;
 };

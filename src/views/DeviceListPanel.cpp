@@ -20,7 +20,7 @@ wxBEGIN_EVENT_TABLE(DeviceListPanel, wxWindow)
     sizer->Add(tree, wxEXPAND, wxEXPAND);
     SetSizer(sizer);
     tree->AppendColumn("Hierarchy");
-    tree->AppendColumn("VID");
+    tree->AppendColumn("Vendor");
     tree->AppendColumn("PID");
     tree->AppendColumn("Address");
     tree->AppendColumn("Port");
@@ -68,7 +68,13 @@ void DeviceListPanel::buildTree(wxTreeListItem item, std::vector<std::shared_ptr
         }
         wxTreeListItem newItem = tree->AppendItem(item, name);
         tree->SetItemData(newItem, new DeviceClientData(device));
-        tree->SetItemText(newItem, 1, wxString::Format("0x%04hx", device->descriptor.idVendor));
+        wxString vendorLabel;
+        if(device->vendorName == "") {
+            vendorLabel = wxString::Format("0x%04hx", device->descriptor.idVendor);
+        } else {
+            vendorLabel = wxString::Format("0x%04hx (%s)", device->descriptor.idVendor, device->vendorName);
+        }
+        tree->SetItemText(newItem, 1, vendorLabel);
         tree->SetItemText(newItem, 2, wxString::Format("0x%04hx", device->descriptor.idProduct));
         tree->SetItemText(newItem, 3, std::to_string(device->address));
         tree->SetItemText(newItem, 4, std::to_string(device->port));

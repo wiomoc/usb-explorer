@@ -15,7 +15,7 @@ wxBEGIN_EVENT_TABLE(MainFrame, wxFrame)
                 EVT_COMMAND(ID_DEVICE_LIST, DEVICE_SELECTED, MainFrame::OnDeviceSelected)
                     wxEND_EVENT_TABLE()
 
-                        MainFrame::MainFrame(App *app) : wxFrame(NULL, wxID_ANY, "USB Explorer", wxDefaultPosition, wxSize(650, 400)), app(app)
+                        MainFrame::MainFrame(App *app) : wxFrame(NULL, wxID_ANY, "USB Explorer", wxDefaultPosition, wxSize(700, 400)), app(app)
 {
     CreateStatusBar();
     wxSplitterWindow *splitter = new wxSplitterWindow(this);
@@ -60,6 +60,6 @@ void MainFrame::OnDevicesCountUpdate(wxCommandEvent &event)
 
 void MainFrame::OnDeviceSelected(wxCommandEvent &event)
 {
-    USBDevice *device = (USBDevice *)event.GetClientData();
-    detail->setDevice(device);
+    DeviceClientData *clientData = (DeviceClientData *)event.GetClientObject();
+    detail->setDevice(clientData->device);
 }

@@ -19,14 +19,17 @@ set(SOURCES
     src/usb/USBHotPlugController.cpp
 )
 
-add_executable(usb ${SOURCES})
+add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/usb.ids.hpp" COMMAND "${PROJECT_SOURCE_DIR}/read_usbids.py" ARGS "${PROJECT_SOURCE_DIR}/usb.ids" "${CMAKE_BINARY_DIR}/usb.ids.hpp" DEPENDS "usb.ids" "read_usbids.py")
+add_executable(usb ${SOURCES} "${CMAKE_BINARY_DIR}/usb.ids.hpp")
+
 set_property(TARGET usb PROPERTY CXX_STANDARD 17)
 ## XXX
-SET(CMAKE_EXE_LINKER_FLAGS "-lusb-1.0 -L/usr/local/lib/ ")
+SET(CMAKE_EXE_LINKER_FLAGS "-lusb-1.0 -L/usr/local/lib/")
 set_property(TARGET usb PROPERTY C_STANDARD 99)
 target_include_directories(usb PUBLIC "${PROJECT_BINARY_DIR}" "${LIB_USB_INCLUDE}")
 target_link_libraries(usb "${LIB_USB}" "${wxWidgets_LIBRARIES}")
 include(${wxWidgets_USE_FILE})
+
 set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR})
 
 install(TARGETS usb

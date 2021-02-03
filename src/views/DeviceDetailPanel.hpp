@@ -10,7 +10,7 @@ class DeviceDetailPanel : public wxPanel
 public:
     DeviceDetailPanel(wxWindow *parent, wxWindowID id, App *app);
     ~DeviceDetailPanel();
-    void setDevice(USBDevice *device);
+    void setDevice(std::shared_ptr<USBDevice> device);
 
 private:
     App *app;

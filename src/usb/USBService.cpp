@@ -1,4 +1,5 @@
 #include "USBService.hpp"
+#include "usb.ids.hpp"
 
 #include <algorithm>
 
@@ -77,6 +78,16 @@ std::vector<std::shared_ptr<USBDevice>> *USBService::getOrCreateDevice(libusb_de
                     dev->name += str;
                 }
             }
+
+            try
+            {
+                const Vendor &vendor = vendors.at(dev->descriptor.idVendor);
+                dev->vendorName = vendor.name;
+            }
+            catch (std::out_of_range &e)
+            {
+            }
+
             // Sort by port number
             auto insertAt = find_if(parent_list->begin(), parent_list->end(), [=](std::shared_ptr<USBDevice> &device) { return device->port > port; });
             insertAt = parent_list->insert(insertAt, std::move(dev));
